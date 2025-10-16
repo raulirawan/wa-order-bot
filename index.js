@@ -114,28 +114,66 @@ async function connectWA() {
 
     sock.ev.on("messages.upsert", async (m) => {
         for (const msg of m.messages) {
+            // Log dasar untuk debugging
             if (!msg.message || msg.key.fromMe) continue;
+            // 🔧 Normalisasi JID (bisa beda antara @whatsapp.net & @s.whatsapp.net)
+            const normalizeJid = (jid) =>
+                jid
+                    ?.replace(/^(\+)?/, "")
+                    ?.replace(/@c\.us$/, "@s.whatsapp.net")
+                    ?.replace(/@whatsapp\.net$/, "@s.whatsapp.net")
+                    ?.trim();
 
-            const from = msg.key.remoteJid;
-            const text = msg.message.conversation?.trim().toUpperCase();
-            if (!text) continue;
+            const fromRaw = msg.key.remoteJid;
+            const from = normalizeJid(fromRaw);
 
-            const match = text.match(/^(APPROVE|REJECT)\s+(\S+)$/);
-            if (!match) continue;
+            // Ambil isi pesan (conversation, extendedTextMessage, caption)
+            const text =
+                msg.message.conversation?.trim() ||
+                msg.message.extendedTextMessage?.text?.trim() ||
+                msg.message.imageMessage?.caption?.trim() ||
+                "";
+
+            const upperText = text.toUpperCase();
+            if (!upperText) continue;
+
+            // Cek format pesan "APPROVE INV-xxxx" atau "REJECT INV-xxxx"
+            const match = upperText.match(/^(APPROVE|REJECT)\s+(\S+)$/);
+            if (!match) {
+                console.log("⚠️ Format pesan tidak sesuai, diabaikan");
+                continue;
+            }
 
             const action = match[1];
             const orderId = match[2];
 
+            // Ambil data order dari pendingOrders
             const order = pendingOrders.get(orderId);
             if (!order) {
-                await sock.sendMessage(from, { text: `❌ Order ${orderId} tidak ditemukan` });
+                await sock.sendMessage(from, { text: `❌ Order ${orderId} tidak ditemukan.` });
+                console.log(`❌ Order ${orderId} tidak ditemukan untuk ${from}`);
                 continue;
             }
 
-            if (!(from in order.recipients)) continue;
-            if (order.recipients[from] !== null) continue;
+            // Normalisasi semua recipient keys dulu
+            const normalizedRecipients = Object.keys(order.recipients).reduce((acc, key) => {
+                acc[normalizeJid(key)] = order.recipients[key];
+                return acc;
+            }, {});
 
-            order.recipients[from] = action === "APPROVE" ? "yes" : "no";
+            if (!(from in normalizedRecipients)) {
+                console.log(`🚫 ${from} bukan bagian dari recipients order ${orderId}`);
+                continue;
+            }
+
+            if (normalizedRecipients[from] !== null) {
+                console.log(`⚠️ ${from} sudah memberikan respon sebelumnya`);
+                await sock.sendMessage(from, { text: `⚠️ Anda sudah merespon order #${orderId}.` });
+                continue;
+            }
+
+            // Simpan hasil approval
+            normalizedRecipients[from] = action === "APPROVE" ? "yes" : "no";
 
             await sock.sendMessage(from, {
                 text:
@@ -144,37 +182,47 @@ async function connectWA() {
                         : `❌ Anda menolak order #${orderId}`,
             });
 
-            // 🧹 Bersihkan JID menjadi nomor saja
-            const cleanNumber = from.replace(/@s\.whatsapp\.net$/, "");
+            // 🧩 Update balik ke pendingOrders (versi fix)
+            for (const jid of Object.keys(order.recipients)) {
+                const norm = normalizeJid(jid);
+                order.recipients[jid] = normalizedRecipients[norm];
+            }
 
-            // 🔁 Callback ke Laravel (nomor tanpa suffix)
+            // 🔁 Callback ke Laravel
+            const cleanNumber = from.replace(/@.*$/, "");
             if (order.callbackUrl) {
                 try {
                     await axios.post(order.callbackUrl, {
                         orderId,
-                        user: cleanNumber, // ← kirim nomor bersih di sini
-                        status: order.recipients[from],
+                        user: cleanNumber,
+                        status: order.recipients[from] ?? normalizedRecipients[from],
                     });
+                    console.log(`🔁 Callback terkirim ke Laravel untuk ${cleanNumber}`);
                 } catch (e) {
-                    console.error("Callback error:", e.message);
+                    console.error("❌ Callback error:", e.message);
                 }
             }
+
             // ✅ Cek status semua recipients
             const allApproved = Object.values(order.recipients).every((v) => v === "yes");
             const anyRejected = Object.values(order.recipients).some((v) => v === "no");
 
             if (allApproved) {
                 order.status = "approved";
-                console.log(`🎉 Order ${orderId} disetujui semua`);
+                console.log(`🎉 Semua user menyetujui order ${orderId}`);
                 pendingOrders.delete(orderId);
             } else if (anyRejected) {
                 order.status = "rejected";
-                console.log(`❌ Order ${orderId} ditolak salah satu user`);
+                console.log(`❌ Salah satu user menolak order ${orderId}`);
                 pendingOrders.delete(orderId);
+            } else {
+                console.log(`🕐 Masih menunggu user lain untuk order ${orderId}`);
             }
+
             saveOrders();
         }
     });
+
 
 
 }
