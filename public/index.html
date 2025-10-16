@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>WhatsApp Bot UI</title>
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      padding: 50px;
+      background: #f5f7fa;
+      color: #333;
+    }
+
+    h1 {
+      font-size: 2em;
+      margin-bottom: 20px;
+    }
+
+    img {
+      margin-top: 20px;
+      width: 300px;
+      border-radius: 10px;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+    }
+
+    .status {
+      font-size: 1.2em;
+      margin-top: 20px;
+    }
+
+    button {
+      margin-top: 20px;
+      padding: 10px 20px;
+      font-size: 1em;
+      border: none;
+      border-radius: 6px;
+      background-color: #25d366;
+      color: white;
+      cursor: pointer;
+      transition: background-color 0.2s ease;
+    }
+
+    button:hover:not(:disabled) {
+      background-color: #1ebd5a;
+    }
+
+    button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+  </style>
+</head>
+
+<body>
+  <h1>WhatsApp Bot</h1>
+
+  <div id="content">
+    <p class="status">Loading...</p>
+  </div>
+
+  <button id="logoutBtn" style="display: none;">Logout</button>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    const socket = io();
+    const content = document.getElementById("content");
+    const logoutBtn = document.getElementById("logoutBtn");
+
+    // Handle logout
+    logoutBtn.onclick = async () => {
+      logoutBtn.disabled = true;
+      logoutBtn.textContent = "Logging out...";
+
+      try {
+        const res = await fetch("/logout", { method: "POST" });
+        const data = await res.json();
+        if (data.success) {
+          alert("✅ Logout berhasil, QR baru akan muncul");
+        }
+      } catch (error) {
+        console.error(error);
+        alert("❌ Logout gagal");
+      } finally {
+        logoutBtn.disabled = false;
+        logoutBtn.textContent = "Logout";
+      }
+    };
+
+    // Socket events
+    socket.on("connect", () => console.log("✅ Socket.io connected"));
+    socket.on("disconnect", () => console.log("❌ Socket.io disconnected"));
+
+    // Tampilkan QR Code
+    socket.on("qr", (qrUrl) => {
+      content.innerHTML = `
+        <p class="status">📱 Scan QR Code:</p>
+        <img src="${qrUrl}" alt="QR Code"/>
+      `;
+      logoutBtn.style.display = "none";
+    });
+
+    // Status koneksi WhatsApp
+    socket.on("connected", (status) => {
+      if (status) {
+        content.innerHTML = `<p class="status">✅ WhatsApp connected!</p>`;
+      } else {
+        content.innerHTML = `<p class="status">❌ WhatsApp disconnected. Scan QR untuk reconnect.</p>`;
+      }
+
+      logoutBtn.style.display = "inline-block";
+      logoutBtn.disabled = false;
+    });
+  </script>
+</body>
+</html>
