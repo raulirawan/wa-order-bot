@@ -210,7 +210,7 @@ async function connectWA() {
             const recipients = Object.values(order.recipients);
             const allResponded = recipients.every((v) => v !== null);
             const allApproved = allResponded && recipients.every((v) => v === "yes");
-            const anyRejected = recipients.includes("no");
+            const allRejected = allResponded && recipients.every((v) => v === "no");
 
             console.log("📋 STATUS SEMENTARA:", order.recipients);
 
@@ -218,7 +218,7 @@ async function connectWA() {
                 order.status = "approved";
                 console.log(`🎉 Semua user menyetujui order ${orderId}`);
                 pendingOrders.delete(orderId);
-            } else if (anyRejected) {
+            } else if (allRejected) {
                 order.status = "rejected";
                 console.log(`❌ Salah satu user menolak order ${orderId}`);
                 pendingOrders.delete(orderId);
