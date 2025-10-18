@@ -210,8 +210,9 @@ async function connectWA() {
             }
 
             // ✅ Cek status semua recipients
-            const allApproved = Object.values(order.recipients).every((v) => v === "yes");
-            const anyRejected = Object.values(order.recipients).some((v) => v === "no");
+            const allResponded = Object.values(order.recipients).every(v => v !== null);
+            const allApproved = allResponded && Object.values(order.recipients).every(v => v === "yes");
+            const anyRejected = Object.values(order.recipients).some(v => v === "no");
 
             if (allApproved) {
                 order.status = "approved";
