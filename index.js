@@ -249,22 +249,59 @@ app.post("/send", verifyApiKey, async (req, res) => {
 
 // === Endpoint API kirim pesan order dengan tombol Yes/No ===
 app.post("/send-order", verifyApiKey, async (req, res) => {
-    const { orderId, recipients, message, callbackUrl } = req.body;
+    const { orderId, recipients, message, callbackUrl, identity, flight_ticket, hotel_ticket } = req.body;
+
     if (!orderId || !recipients || !message)
         return res.status(400).send({ error: "orderId, recipients, message wajib" });
 
     try {
-        if (!isConnected) return res.status(500).send({ error: "WA belum connect" });
+        if (!isConnected)
+            return res.status(500).send({ error: "WA belum connect" });
 
         const recipientsStatus = {};
+        const imageFields = [
+            { key: "identity", value: identity, caption: "🪪 Identitas" },
+            { key: "flight_ticket", value: flight_ticket, caption: "✈️ Tiket Penerbangan" },
+            { key: "hotel_ticket", value: hotel_ticket, caption: "🏨 Tiket Hotel" },
+        ];
+
         for (const r of recipients) {
             const jid = r.includes("@s.whatsapp.net") ? r : `${r}@s.whatsapp.net`;
             recipientsStatus[jid] = null;
+
+            // Kirim pesan utama
             await sock.sendMessage(jid, { text: message });
+
+            // Kirim masing-masing gambar jika ada
+            for (const img of imageFields) {
+                if (!img.value) continue; // skip kalau kosong/null
+
+                let imagePayload;
+
+                if (img.value.startsWith("http")) {
+                    imagePayload = { url: img.value };
+                } else if (img.value.startsWith("data:image")) {
+                    const base64Data = img.value.split(",")[1];
+                    imagePayload = Buffer.from(base64Data, "base64");
+                } else {
+                    // asumsikan path lokal
+                    imagePayload = { url: img.value };
+                }
+
+                await sock.sendMessage(jid, {
+                    image: imagePayload,
+                    caption: img.caption,
+                });
+            }
         }
 
-        pendingOrders.set(orderId, { recipients: recipientsStatus, callbackUrl, status: "pending" });
-        saveOrders(); // 💾 simpan order baru
+        // Simpan order
+        pendingOrders.set(orderId, {
+            recipients: recipientsStatus,
+            callbackUrl,
+            status: "pending",
+        });
+        saveOrders();
 
         res.send({ success: true, orderId });
     } catch (e) {
@@ -272,6 +309,7 @@ app.post("/send-order", verifyApiKey, async (req, res) => {
         res.status(500).send({ error: e.message });
     }
 });
+
 
 
 
