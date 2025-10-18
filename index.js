@@ -138,7 +138,7 @@ async function connectWA() {
             if (!upperText) continue;
 
             // Cek format pesan "APPROVE INV-xxxx" atau "REJECT INV-xxxx"
-            const match = upperText.match(/^(APPROVE|REJECT)\s+(\S+)$/);
+            const match = upperText.match(/^(APPROVE|REJECT)\s+(\S+)(?:\s+(.*))?$/);
             if (!match) {
                 console.log("⚠️ Format pesan tidak sesuai, diabaikan");
                 continue;
@@ -146,6 +146,7 @@ async function connectWA() {
 
             const action = match[1];
             const orderId = match[2];
+            const rejectReason = match[3]?.trim() || null;
 
             // Ambil data order dari pendingOrders
             const order = pendingOrders.get(orderId);
@@ -175,12 +176,16 @@ async function connectWA() {
             // Simpan hasil approval
             normalizedRecipients[from] = action === "APPROVE" ? "yes" : "no";
 
-            await sock.sendMessage(from, {
-                text:
-                    action === "APPROVE"
-                        ? `✅ Anda menyetujui order #${orderId}`
-                        : `❌ Anda menolak order #${orderId}`,
-            });
+
+            let replyText;
+            if (action === "APPROVE") {
+                replyText = `✅ Anda menyetujui order #${orderId}`;
+            } else {
+                replyText = `❌ Anda menolak order #${orderId}`;
+                if (rejectReason) replyText += `\n📝 Alasan: ${rejectReason}`;
+            }
+
+            await sock.sendMessage(from, { text: replyText });
 
             // 🧩 Update balik ke pendingOrders (versi fix)
             for (const jid of Object.keys(order.recipients)) {
@@ -196,6 +201,7 @@ async function connectWA() {
                         orderId,
                         user: cleanNumber,
                         status: order.recipients[from] ?? normalizedRecipients[from],
+                        reject_reason: rejectReason,
                     });
                     console.log(`🔁 Callback terkirim ke Laravel untuk ${cleanNumber}`);
                 } catch (e) {
