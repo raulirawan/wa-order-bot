@@ -114,9 +114,9 @@ async function connectWA() {
 
     sock.ev.on("messages.upsert", async (m) => {
         for (const msg of m.messages) {
-            // Log dasar untuk debugging
             if (!msg.message || msg.key.fromMe) continue;
-            // 🔧 Normalisasi JID (bisa beda antara @whatsapp.net & @s.whatsapp.net)
+
+            // 🔧 Normalisasi JID (kadang beda format)
             const normalizeJid = (jid) =>
                 jid
                     ?.replace(/^(\+)?/, "")
@@ -137,10 +137,10 @@ async function connectWA() {
             const upperText = text.toUpperCase();
             if (!upperText) continue;
 
-            // Cek format pesan "APPROVE INV-xxxx" atau "REJECT INV-xxxx"
+            // Format pesan "APPROVE INV-XXXX" atau "REJECT INV-XXXX alasan"
             const match = upperText.match(/^(APPROVE|REJECT)\s+(\S+)(?:\s+(.*))?$/);
             if (!match) {
-                console.log("⚠️ Format pesan tidak sesuai, diabaikan");
+                console.log("⚠️ Format pesan tidak sesuai, diabaikan:", upperText);
                 continue;
             }
 
@@ -148,7 +148,7 @@ async function connectWA() {
             const orderId = match[2];
             const rejectReason = match[3]?.trim() || null;
 
-            // Ambil data order dari pendingOrders
+            // Ambil data order
             const order = pendingOrders.get(orderId);
             if (!order) {
                 await sock.sendMessage(from, { text: `❌ Order ${orderId} tidak ditemukan.` });
@@ -156,7 +156,7 @@ async function connectWA() {
                 continue;
             }
 
-            // Normalisasi semua recipient keys dulu
+            // Normalisasi recipients
             const normalizedRecipients = Object.keys(order.recipients).reduce((acc, key) => {
                 acc[normalizeJid(key)] = order.recipients[key];
                 return acc;
@@ -173,21 +173,18 @@ async function connectWA() {
                 continue;
             }
 
-            // Simpan hasil approval
+            // Simpan hasil
             normalizedRecipients[from] = action === "APPROVE" ? "yes" : "no";
 
-
-            let replyText;
-            if (action === "APPROVE") {
-                replyText = `✅ Anda menyetujui order #${orderId}`;
-            } else {
-                replyText = `❌ Anda menolak order #${orderId}`;
-                if (rejectReason) replyText += `\n📝 Alasan: ${rejectReason}`;
-            }
+            let replyText =
+                action === "APPROVE"
+                    ? `✅ Anda menyetujui order #${orderId}`
+                    : `❌ Anda menolak order #${orderId}`;
+            if (rejectReason) replyText += `\n📝 Alasan: ${rejectReason}`;
 
             await sock.sendMessage(from, { text: replyText });
 
-            // 🧩 Update balik ke pendingOrders (versi fix)
+            // Update pendingOrders
             for (const jid of Object.keys(order.recipients)) {
                 const norm = normalizeJid(jid);
                 order.recipients[jid] = normalizedRecipients[norm];
@@ -210,9 +207,12 @@ async function connectWA() {
             }
 
             // ✅ Cek status semua recipients
-            const allResponded = Object.values(order.recipients).every(v => v !== null);
-            const allApproved = allResponded && Object.values(order.recipients).every(v => v === "yes");
-            const anyRejected = Object.values(order.recipients).some(v => v === "no");
+            const recipients = Object.values(order.recipients);
+            const allResponded = recipients.every((v) => v !== null);
+            const allApproved = allResponded && recipients.every((v) => v === "yes");
+            const anyRejected = recipients.includes("no");
+
+            console.log("📋 STATUS SEMENTARA:", order.recipients);
 
             if (allApproved) {
                 order.status = "approved";
@@ -223,12 +223,13 @@ async function connectWA() {
                 console.log(`❌ Salah satu user menolak order ${orderId}`);
                 pendingOrders.delete(orderId);
             } else {
-                console.log(`🕐 Masih menunggu user lain untuk order ${orderId}`);
+                console.log(`🕐 Menunggu user lain untuk order ${orderId}...`);
             }
 
             saveOrders();
         }
     });
+
 
 
 
