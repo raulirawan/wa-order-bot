@@ -260,7 +260,7 @@ app.post("/send-order", verifyApiKey, async (req, res) => {
 
         const recipientsStatus = {};
         const imageFields = [
-            { key: "identity", value: identity, caption: "🪪 Identitas" },
+            { key: "identity", value: identity, caption: "🪪 Passport" },
             { key: "flight_ticket", value: flight_ticket, caption: "✈️ Tiket Penerbangan" },
             { key: "hotel_ticket", value: hotel_ticket, caption: "🏨 Tiket Hotel" },
         ];
