@@ -146,8 +146,8 @@ async function connectWA() {
 
             const action = match[1];
             const orderId = match[2];
-            const rejectReason = match[3]?.trim() || null;
-
+            const reasonMatch = text.match(/^(APPROVE|REJECT)\s+\S+\s+(.+)$/i);
+            const rejectReason = reasonMatch?.[2]?.trim() || null;
             // Ambil data order
             const order = pendingOrders.get(orderId);
             if (!order) {
@@ -241,19 +241,51 @@ loadOrders();
 
 // === Endpoint API kirim pesan ===
 app.post("/send", verifyApiKey, async (req, res) => {
-    const { to, text } = req.body;
-    if (!to || !text) return res.status(400).send({ error: "to & text wajib" });
+    const { to, text, identity, flight_ticket, hotel_ticket } = req.body;
+
+    if (!to || !text)
+        return res.status(400).send({ error: "to & text wajib" });
 
     try {
-        if (!isConnected) return res.status(500).send({ error: "WA belum connect" });
+        if (!isConnected)
+            return res.status(500).send({ error: "WA belum connect" });
 
-        await sock.sendMessage(`${to}@s.whatsapp.net`, { text });
-        res.send({ success: true, to, text });
+        const jid = `${to}@s.whatsapp.net`;
+
+        // Kirim pesan teks utama
+        await sock.sendMessage(jid, { text });
+
+        // Daftar media opsional
+        const mediaList = [
+            { key: "identity", value: identity, caption: "🪪 Passport" },
+            { key: "flight_ticket", value: flight_ticket, caption: "✈️ Tiket Penerbangan" },
+            { key: "hotel_ticket", value: hotel_ticket, caption: "🏨 Tiket Hotel" },
+        ];
+
+        // Kirim hanya yang ada datanya
+        for (const item of mediaList) {
+            if (item.value) {
+                await sock.sendMessage(jid, {
+                    image: { url: item.value },
+                    caption: item.caption,
+                });
+            }
+        }
+
+        res.send({
+            success: true,
+            to,
+            sent: {
+                text: true,
+                media: mediaList.filter((m) => !!m.value).map((m) => m.key),
+            },
+        });
     } catch (e) {
         console.error("Send error:", e);
         res.status(500).send({ error: e.message });
     }
 });
+
 
 // === Endpoint API kirim pesan order dengan tombol Yes/No ===
 app.post("/send-order", verifyApiKey, async (req, res) => {
