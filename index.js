@@ -192,19 +192,6 @@ async function connectWA() {
 
             // 🔁 Callback ke Laravel
             const cleanNumber = from.replace(/@.*$/, "");
-            if (order.callbackUrl) {
-                try {
-                    await axios.post(order.callbackUrl, {
-                        orderId,
-                        user: cleanNumber,
-                        status: order.recipients[from] ?? normalizedRecipients[from],
-                        reject_reason: rejectReason,
-                    });
-                    console.log(`🔁 Callback terkirim ke Laravel untuk ${cleanNumber}`);
-                } catch (e) {
-                    console.error("❌ Callback error:", e.message);
-                }
-            }
 
             // ✅ Cek status semua recipients
             const recipients = Object.values(order.recipients);
@@ -227,6 +214,21 @@ async function connectWA() {
             }
 
             saveOrders();
+
+            if (order.callbackUrl) {
+                try {
+                    await axios.post(order.callbackUrl, {
+                        orderId,
+                        user: cleanNumber,
+                        status: order.recipients[from] ?? normalizedRecipients[from],
+                        reject_reason: rejectReason,
+                    });
+                    console.log(`🔁 Callback terkirim ke Laravel untuk ${cleanNumber}`);
+                } catch (e) {
+                    console.error("❌ Callback error:", e.message);
+                }
+            }
+
         }
     });
 
