@@ -1,4 +1,5 @@
 {
+  "type":"module",
   "name": "wa-order-bot",
   "version": "1.0.0",
   "main": "index.js",
@@ -10,7 +11,7 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
-    "@whiskeysockets/baileys": "^6.6.0",
+    "@whiskeysockets/baileys": "^7.0.0-rc.6",
     "axios": "^1.12.2",
     "dotenv": "^17.2.3",
     "express": "^5.1.0",

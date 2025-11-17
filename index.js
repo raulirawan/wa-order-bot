@@ -1,13 +1,19 @@
-const express = require("express");
-const http = require("http");
-const { Server } = require("socket.io");
-const pino = require("pino");
-const qrcode = require("qrcode");
-const fs = require("fs");
-const path = require("path");
-const { default: makeWASocket, useMultiFileAuthState, DisconnectReason } = require("@whiskeysockets/baileys");
+import express from "express";
+import http from "http";
+import { Server } from "socket.io";
+import pino from "pino";
+import qrcode from "qrcode";
+import fs from "fs";
+import path from "path";
+import axios from "axios";
+import { fileURLToPath } from "url";
+
+import makeWASocket, {
+    useMultiFileAuthState,
+    DisconnectReason
+} from "@whiskeysockets/baileys";
+
 const app = express();
-const axios = require('axios');
 const server = http.createServer(app);
 const io = new Server(server, {
     cors: {
@@ -18,7 +24,12 @@ const io = new Server(server, {
     pingInterval: 25000,
 });
 
-require("dotenv").config();
+import dotenv from "dotenv";
+dotenv.config();
+
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 app.use(express.json());
 app.use(express.static("public")); // serve frontend dari folder public
@@ -124,7 +135,7 @@ async function connectWA() {
                     ?.replace(/@whatsapp\.net$/, "@s.whatsapp.net")
                     ?.trim();
 
-            const fromRaw = msg.key.participant || msg.key.remoteJid;
+            const fromRaw = msg.key.remoteJidAlt || msg.key.remoteJid;
             const from = normalizeJid(fromRaw);
 
             // Ambil isi pesan (conversation, extendedTextMessage, caption)
@@ -163,7 +174,6 @@ async function connectWA() {
             }, {});
 
             if (!(from in normalizedRecipients)) {
-                console.log(msg.messageContextInfo?.deviceListMetadata);
                 console.log("🚀 ~ connectWA ~ msg:", msg);
                 console.log(`🚫 ${from} bukan bagian dari recipients order ${orderId}`);
                 continue;
