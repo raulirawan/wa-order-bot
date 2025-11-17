@@ -163,6 +163,7 @@ async function connectWA() {
             }, {});
 
             if (!(from in normalizedRecipients)) {
+                console.log(msg.messageContextInfo?.deviceListMetadata);
                 console.log("🚀 ~ connectWA ~ msg:", msg);
                 console.log(`🚫 ${from} bukan bagian dari recipients order ${orderId}`);
                 continue;
