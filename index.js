@@ -124,7 +124,7 @@ async function connectWA() {
                     ?.replace(/@whatsapp\.net$/, "@s.whatsapp.net")
                     ?.trim();
 
-            const fromRaw = msg.key.remoteJid;
+            const fromRaw = msg.key.participant || msg.key.remoteJid;
             const from = normalizeJid(fromRaw);
 
             // Ambil isi pesan (conversation, extendedTextMessage, caption)
