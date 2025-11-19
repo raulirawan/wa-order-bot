@@ -255,7 +255,7 @@ loadOrders();
 
 // === Endpoint API kirim pesan ===
 app.post("/send", verifyApiKey, async (req, res) => {
-    const { to, text, identity, flight_ticket, hotel_ticket } = req.body;
+    const { to, text, identity, flight_ticket, hotel_ticket, family_card } = req.body;
 
     if (!to || !text)
         return res.status(400).send({ error: "to & text wajib" });
@@ -274,6 +274,7 @@ app.post("/send", verifyApiKey, async (req, res) => {
             { key: "identity", value: identity, caption: "🪪 Passport" },
             { key: "flight_ticket", value: flight_ticket, caption: "✈️ Tiket Penerbangan" },
             { key: "hotel_ticket", value: hotel_ticket, caption: "🏨 Tiket Hotel" },
+            { key: "family_card", value: family_card, caption: "👪 Kartu Keluarga" },
         ];
 
         // Kirim hanya yang ada datanya
@@ -303,7 +304,7 @@ app.post("/send", verifyApiKey, async (req, res) => {
 
 // === Endpoint API kirim pesan order dengan tombol Yes/No ===
 app.post("/send-order", verifyApiKey, async (req, res) => {
-    const { orderId, recipients, message, callbackUrl, identity, flight_ticket, hotel_ticket } = req.body;
+    const { orderId, recipients, message, callbackUrl, identity, flight_ticket, hotel_ticket, family_card } = req.body;
 
     if (!orderId || !recipients || !message)
         return res.status(400).send({ error: "orderId, recipients, message wajib" });
@@ -317,6 +318,7 @@ app.post("/send-order", verifyApiKey, async (req, res) => {
             { key: "identity", value: identity, caption: "🪪 Passport" },
             { key: "flight_ticket", value: flight_ticket, caption: "✈️ Tiket Penerbangan" },
             { key: "hotel_ticket", value: hotel_ticket, caption: "🏨 Tiket Hotel" },
+            { key: "family_card", value: family_card, caption: "👪 Kartu Keluarga" },
         ];
 
         for (const r of recipients) {
